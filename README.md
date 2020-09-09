@@ -13,4 +13,4 @@ only compatible for Windows since K3 software is only available for Windows.
 1. create config.txt and put inside TempData folder.
 2. run the app and choose year then month folder.
 
-<img src="https://raw.githubusercontent.com/NowDB/smart-body-temp/master/logo.png" alt="Smart Body Temperature"/>
+<img src="https://raw.githubusercontent.com/NowDB/smart-body-temp/master/application.png" alt="Smart Body Temperature"/>

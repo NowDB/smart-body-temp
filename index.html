@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>NowDB Cloud Data Service</title>
+    <link rel="stylesheet" href="css/photon.min.css">
+</head>
+
+<body>
+    <div class="window">
+        <header class="toolbar toolbar-header">
+            <h1 class="title" id="messageLogger">Choose Folder to Watch</h1>
+            <div class="toolbar-actions">
+                <button class="btn btn-default" id="start">
+                    <span class="icon icon-folder" style="color:dodgerblue;"></span>&nbsp;Folder
+                </button>
+                <button class="btn btn-default" onclick="resetLog();">
+                    <span class="icon icon-arrows-ccw" style="color:orange;"></span>&nbsp;Clear Log
+                </button>
+                <button class="btn btn-default" id="stop" style="display:none;">
+                    <span class="icon icon-stop" style="color:red;"></span>&nbsp;Stop
+                </button>
+            </div>
+        </header>
+        <div class="window-content">
+            <table class="table-striped" id="log-container">
+                <thead>
+                    <tr>
+                        <th>Date Time</th>
+                        <th>Body Temperature</th>
+                        <th>Room Temperature</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <footer class="toolbar toolbar-footer">
+            <h1 class="title">Smart Body Temperature Monitoring System</h1>
+        </footer>
+    </div>
+    <script>
+        'use strict';
+
+        var chokidar = require('chokidar');
+        var fs = require('fs');
+        var lineReader = require('line-reader');
+        const $ = require("jquery");
+        var watcher = null;
+        var showInLogFlag = false;
+
+        /**Notification Send with Filter*/
+        var notification_send_filter = function(data, contents, filters) {
+            var settings = {
+                "url": "https://onesignal.com/api/v1/notifications",
+                "method": "POST",
+                "timeout": 0,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Authorization": "Basic YTQ0MTdlMGItZDhkOC00NjIwLTk4NTMtZjdmZWQwYzk0MzEy",
+                },
+                "data": JSON.stringify({
+                    "app_id": "85dfe863-9888-469a-870a-b04daf481ddb",
+                    "filters": [filters],
+                    "android_group": "1",
+                    "android_group_message": {
+                        "en": "You received $[notif_count] notification"
+                    },
+                    "data": data,
+                    "contents": contents
+                }),
+            };
+
+            $.ajax(settings).done(function(response) {
+                // console.log(response);
+            });
+        }
+
+        function StartWatcher(path) {
+            document.getElementById("start").disabled = true;
+            document.getElementById("messageLogger").innerHTML = "Scanning the path, please wait ...";
+
+            watcher = chokidar.watch(path, {
+                ignored: /[\/\\]\./,
+                persistent: true
+            });
+
+            function onWatcherReady() {
+                console.info('From here can you check for real changes, the initial scan has been completed.');
+                showInLogFlag = true;
+                document.getElementById("stop").removeAttribute('style');
+                document.getElementById("messageLogger").innerHTML = "Watching " + path;
+            }
+
+            watcher
+                .on('add', function(path) {
+                    if (showInLogFlag) {
+                        console.log(path, "new");
+                    }
+                })
+                .on('addDir', function(path) {
+                    if (showInLogFlag) {
+                        console.log(path, "new");
+                    }
+                })
+                .on('change', function(path) {
+                    if (showInLogFlag) {
+                        var config_file = path.split("\\")[0] + "\\" + path.split("\\")[1] + "\\" + path.split("\\")[2] + "\\config.txt";
+                        var institution = '';
+                        var lat = '';
+                        var lng = '';
+                        var building = '';
+                        var room = '';
+                        var status = '';
+                        var instance = '';
+                        lineReader.eachLine(config_file, (line, last) => {
+                            if (last) {
+                                institution = line.split(',')[0];
+                                lat = line.split(',')[1];
+                                lng = line.split(',')[2];
+                                building = line.split(',')[3];
+                                room = line.split(',')[4];
+                                status = line.split(',')[5];
+                                instance = line.split(',')[6];
+                            };
+                        });
+                        lineReader.eachLine(path, (line, last) => {
+                            if (last) {
+                                /**Current Date */
+                                var get_current_day = function() {
+                                    var day = new Date();
+                                    var dd = day.getDate();
+                                    var mm = day.getMonth() + 1;
+                                    var yyyy = day.getFullYear();
+
+                                    if (dd < 10) {
+                                        dd = '0' + dd;
+                                    }
+                                    if (mm < 10) {
+                                        mm = '0' + mm;
+                                    }
+
+                                    var current_day = dd + '-' + mm + '-' + yyyy;
+                                    return current_day;
+                                }
+
+                                /**Current Time */
+                                var get_current_time = function() {
+                                    var day = new Date();
+                                    var hour = day.getHours();
+                                    var minute = day.getMinutes();
+
+                                    if (minute < 10) {
+                                        minute = '0' + minute;
+                                    }
+                                    if (hour < 10) {
+                                        hour = '0' + hour;
+                                    }
+
+                                    var current_time = hour + ':' + minute;
+
+                                    return current_time;
+                                }
+
+                                var data = line;
+                                var data_split = data.split(',');
+                                var body_temp = data_split[2].replace("C", "");
+                                var room_temp = data_split[3].replace("C", "");
+
+                                var tableRef = document.getElementById('log-container').getElementsByTagName('tbody')[0];
+
+                                $(document).find('#log-container').prepend('<tr>' +
+                                    '<td>' + get_current_day() + ' ' + get_current_time() + '</td>' +
+                                    '<td>' + body_temp + ' C</td>' +
+                                    '<td>' + room_temp + ' C</td>' +
+                                    '<tr>');
+
+                                var data = "institution=" + institution + "&" +
+                                    "lat=" + lat + "&" +
+                                    "lng=" + lng + "&" +
+                                    "building=" + building + "&" +
+                                    "room=" + room + "&" +
+                                    "temp_body=" + body_temp + "&" +
+                                    "temp_room=" + room_temp + "&" +
+                                    "date=" + get_current_day() + ' ' + get_current_time() + "&" +
+                                    "public=" + status + "&" +
+                                    "instance=" + instance + "&" +
+                                    "token=52f866f58d909e13236110e5&" +
+                                    "project=smart_moni_temp&" +
+                                    "collection=data_log&" +
+                                    "appid=5f56f330a752677303256843";
+
+                                var xhr = new XMLHttpRequest();
+                                xhr.withCredentials = true;
+
+                                xhr.addEventListener("readystatechange", function() {
+                                    if (this.readyState === 4) {
+                                        // console.log(this.responseText);
+                                    }
+                                });
+
+                                xhr.open("POST", "https://io.nowdb.net/v2/insert/data_log");
+                                xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+
+                                xhr.send(data);
+
+                                // Send Notification
+                                var notification_filter = {
+                                    "field": "tag",
+                                    "key": "instance",
+                                    "relation": "=",
+                                    "value": instance
+                                };
+
+                                var notification_data = {
+                                    "instance": instance,
+                                    "lat": lat,
+                                    "lng": lng,
+                                    "building": building,
+                                    "room": room,
+                                    "body_temp": body_temp,
+                                    "room_temp": room_temp
+                                }
+
+                                var notification_content = {
+                                    "en": "New Temperature Body Scan " + body_temp + ' C'
+                                };
+
+                                notification_send_filter(notification_data, notification_content, notification_filter);
+                            }
+                        });
+                    }
+                })
+                .on('unlink', function(path) {
+                    if (showInLogFlag) {
+                        console.log(path, "delete");
+                    }
+                })
+                .on('unlinkDir', function(path) {
+                    if (showInLogFlag) {
+                        console.log(path, "delete");
+                    }
+                })
+                .on('error', function(error) {
+                    if (showInLogFlag) {
+                        console.log(path);
+                        console.log(error, "delete");
+                    }
+                })
+                .on('ready', onWatcherReady)
+                .on('raw', function(event, path, details) {
+                    // console.log('Raw event info:', event, path, details);
+                });
+        }
+
+        document.getElementById("start").addEventListener("click", function(e) {
+            const {
+                dialog
+            } = require('electron').remote;
+
+            dialog.showOpenDialog({
+                properties: ['openDirectory']
+            }, function(path) {
+                if (path) {
+                    StartWatcher(path[0]);
+                } else {
+                    console.log("No path selected");
+                }
+            });
+        }, false);
+
+        document.getElementById("stop").addEventListener("click", function(e) {
+            if (!watcher) {
+                console.log("You need to start first the watcher");
+            } else {
+                watcher.close();
+                document.getElementById("start").disabled = false;
+                showInLogFlag = false;
+                document.getElementById("messageLogger").innerHTML = "Choose Folder to Watch";
+            }
+        }, false);
+
+        function resetLog() {
+            return document.getElementById('log-container').getElementsByTagName('tbody')[0].innerHTML = '';
+        }
+    </script>
+</body>
+
+</html>

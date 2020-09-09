@@ -1,0 +1,38 @@
+{
+    "name": "smart_body_watcher",
+    "version": "1.0.0",
+    "description": "Smart body temperature watcher",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "postinstall": "electron-builder install-app-deps",
+        "pack": "electron-builder --dir",
+        "dist": "electron-builder --publish never"
+    },
+    "build": {
+        "appId": "app.web.smart-body-temp",
+        "win": {
+            "icon": "logo.png",
+            "target": "portable"
+        }
+    },
+    "publish": "never",
+    "keywords": [
+        "NowDB",
+        "File Watcher"
+    ],
+    "author": {
+        "name": "Taufik Sulaeman P",
+        "email": "taufiksu@gmail.com"
+    },
+    "license": "CC0-1.0",
+    "devDependencies": {
+        "electron-builder": "^22.8.0",
+        "electron-prebuilt": "^1.0.1"
+    },
+    "dependencies": {
+        "chokidar": "^1.5.1",
+        "jquery": "^3.5.1",
+        "line-reader": "^0.4.0"
+    }
+}

@@ -1,4 +1,4 @@
-# smart-body-temp
+# Smart Body Temperature Data Broadaster
 NowDB integration software for body temperature
 
 This application support K3 Infrared Body Temperature. You can use this application 
